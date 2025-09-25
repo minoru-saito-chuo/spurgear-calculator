@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fusion 360 スパーギア パラメータ計算機 (3D対応版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #f0f0f0;
+        }
+        .dark body {
+            background-color: #1c1c1e;
+        }
+        .app-container {
+            background-color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        .dark .app-container {
+            background-color: rgba(44, 44, 46, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .input-group {
+            position: relative;
+        }
+        .input-unit {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            pointer-events: none;
+        }
+        /* macOS like segmented control */
+        .segmented-control {
+            display: inline-flex;
+            background-color: rgb(229 231 235 / 0.8);
+            border-radius: 0.5rem;
+            padding: 2px;
+            border: 1px solid rgba(0,0,0,0.04);
+        }
+        .dark .segmented-control {
+             background-color: rgb(55 65 81 / 0.8);
+             border: 1px solid rgba(255,255,255,0.04);
+        }
+        .segmented-control button {
+            background-color: transparent;
+            border: none;
+            padding: 0.3rem 0.8rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #4b5563;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .dark .segmented-control button {
+            color: #d1d5db;
+        }
+        .segmented-control button.active {
+            background-color: #ffffff;
+            color: #000000;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 1px rgba(0,0,0,0.05);
+        }
+        .dark .segmented-control button.active {
+            background-color: #555555;
+            color: #ffffff;
+        }
+
+        input[type="number"] {
+            -moz-appearance: textfield;
+            background-color: rgb(229 231 235 / 0.5);
+        }
+        .dark input[type="number"]{
+            background-color: rgb(55 65 81 / 0.5);
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        #preview-container-3d {
+            position: relative;
+            cursor: grab;
+        }
+        #preview-container-3d:active {
+            cursor: grabbing;
+        }
+        #scale-info {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-6xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-gray-100">Fusion 360 スパーギア計算機</h1>
+            <p class="mt-2 text-lg text-gray-600 dark:text-gray-400">直感的な入力で、Fusion360のパラメータを自動算出します。</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- ===== 入力 & 結果エリア ===== -->
+            <div class="app-container rounded-xl shadow-lg p-6 sm:p-8 space-y-8">
+                <!-- 直感的パラメータ入力 -->
+                <div>
+                    <h2 class="text-xl font-semibold mb-5 text-gray-900 dark:text-gray-100">基本パラメータ</h2>
+                    <div class="space-y-5">
+                        <div>
+                            <label for="pitchDiameter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">基準円直径</label>
+                            <div class="input-group">
+                                <input type="number" id="pitchDiameter" value="100" class="w-full border border-gray-300/50 dark:border-gray-600/50 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                <span class="input-unit">mm</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="numTeeth" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">歯数</label>
+                            <input type="number" id="numTeeth" value="20" class="w-full border border-gray-300/50 dark:border-gray-600/50 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        </div>
+                        <div>
+                            <label for="gearThickness" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ギアの厚み</label>
+                            <div class="input-group">
+                                <input type="number" id="gearThickness" value="10" class="w-full border border-gray-300/50 dark:border-gray-600/50 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                <span class="input-unit">mm</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="holeDiameter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">中心穴の直径</label>
+                             <div class="input-group">
+                                <input type="number" id="holeDiameter" value="8" class="w-full border border-gray-300/50 dark:border-gray-600/50 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                <span class="input-unit">mm</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fusion 360 パラメータ出力 -->
+                <div>
+                    <h2 class="text-xl font-semibold mb-5 text-gray-900 dark:text-gray-100">Fusion 360 設定値</h2>
+                    <div id="results" class="space-y-3 bg-gray-500/10 p-4 rounded-lg">
+                        <!-- 結果はここに動的に挿入されます -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== プレビューエリア ===== -->
+            <div class="app-container rounded-xl shadow-lg p-6 sm:p-8 flex flex-col items-center justify-center min-h-[400px]">
+                 <div class="w-full flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">プレビュー</h2>
+                    <div class="segmented-control">
+                        <button id="toggle-2d">2D</button>
+                        <button id="toggle-3d" class="active">3D</button>
+                    </div>
+                 </div>
+                 
+                 <div id="preview-container-3d" class="w-full h-full aspect-square max-w-md bg-gray-500/5 dark:bg-gray-900/10 rounded-lg overflow-hidden relative">
+                     <!-- 3D Canvas will be inserted here -->
+                     <div id="scale-info">Grid: 10 mm</div>
+                 </div>
+                 <div id="preview-container-2d" class="w-full h-full aspect-square max-w-md hidden bg-gray-500/5 dark:bg-gray-900/10 rounded-lg">
+                     <svg id="gear-preview-2d" class="w-full h-full" viewBox="-110 -110 220 220"></svg>
+                 </div>
+
+                 <div id="error-message" class="text-red-500 mt-4 text-center hidden"></div>
+                 <p id="preview-helper-text" class="text-sm text-gray-500 mt-2">ドラッグで回転、スクロールでズーム</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Three.js ライブラリ -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // DOM要素
+        const inputs = {
+            pitchDiameter: document.getElementById('pitchDiameter'),
+            numTeeth: document.getElementById('numTeeth'),
+            gearThickness: document.getElementById('gearThickness'),
+            holeDiameter: document.getElementById('holeDiameter')
+        };
+        const resultsContainer = document.getElementById('results');
+        const errorMessage = document.getElementById('error-message');
+        
+        // プレビュー関連 DOM
+        const toggle2dBtn = document.getElementById('toggle-2d');
+        const toggle3dBtn = document.getElementById('toggle-3d');
+        const previewContainer3D = document.getElementById('preview-container-3d');
+        const previewContainer2D = document.getElementById('preview-container-2d');
+        const previewHelperText = document.getElementById('preview-helper-text');
+        const svg2D = document.getElementById('gear-preview-2d');
+        const scaleInfo = document.getElementById('scale-info');
+
+        let is3DMode = true;
+
+        // --- 3Dプレビュー関連 ---
+        let scene, camera, renderer, controls, currentGear, gridHelper;
+
+        function init3D() {
+            scene = new THREE.Scene();
+            
+            const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            scene.background = null; // transparent background
+
+            const width = previewContainer3D.clientWidth;
+            const height = previewContainer3D.clientHeight;
+
+            camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 2000);
+            camera.position.set(100, 100, 100);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setClearColor(0x000000, 0); // Transparent background
+            renderer.setSize(width, height);
+            previewContainer3D.insertBefore(renderer.domElement, scaleInfo);
+            
+            const ambientLight = new THREE.AmbientLight(isDarkMode ? 0xcccccc : 0xffffff, 1.2);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(isDarkMode ? 0xaaaaaa : 0xffffff, 2.0);
+            directionalLight.position.set(60, 100, 60);
+            scene.add(directionalLight);
+
+            const gridColor = isDarkMode ? 0x555555 : 0xcccccc;
+            gridHelper = new THREE.GridHelper(200, 20, gridColor, gridColor);
+            gridHelper.material.opacity = 0.5;
+            gridHelper.material.transparent = true;
+            scene.add(gridHelper);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            window.addEventListener('resize', () => {
+                const w = previewContainer3D.clientWidth;
+                const h = previewContainer3D.clientHeight;
+                renderer.setSize(w, h);
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+            });
+            
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+                const isDarkMode = event.matches;
+                ambientLight.color.set(isDarkMode ? 0xcccccc : 0xffffff);
+                directionalLight.color.set(isDarkMode ? 0xaaaaaa : 0xffffff);
+                const newGridColor = isDarkMode ? 0x555555 : 0xcccccc;
+                gridHelper.material.color.set(newGridColor);
+            });
+        }
+
+        // --- メインロジック ---
+        function updateGearParameters() {
+            const params = {
+                pitchDiameter: parseFloat(inputs.pitchDiameter.value) || 0,
+                numTeeth: parseInt(inputs.numTeeth.value, 10) || 0,
+                gearThickness: parseFloat(inputs.gearThickness.value) || 0,
+                holeDiameter: parseFloat(inputs.holeDiameter.value) || 0,
+                pressureAngle: 20.0
+            };
+            
+            if (params.pitchDiameter <= 0 || params.numTeeth < 3 || params.gearThickness <= 0 || params.pitchDiameter <= params.holeDiameter) {
+                resultsContainer.innerHTML = '<p class="text-gray-500">有効な数値を入力してください。</p>';
+                if (currentGear) scene.remove(currentGear);
+                svg2D.innerHTML = '';
+                errorMessage.textContent = 'エラー: 基準円直径は穴の直径より大きく、歯数は3以上である必要があります。';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+                errorMessage.classList.add('hidden');
+
+            params.module = params.pitchDiameter / params.numTeeth;
+            params.rootFilletRadius = params.module * 0.38;
+
+            const fusionParams = {
+                '規格': 'Metric',
+                '圧力角': `${params.pressureAngle.toFixed(1)} deg`,
+                'モジュール': params.module.toFixed(3),
+                '歯数': params.numTeeth,
+                'バックラッシ': `0.00 mm`,
+                '歯元隅肉半径': `${params.rootFilletRadius.toFixed(3)} mm`,
+                'ギアの厚み': `${params.gearThickness.toFixed(2)} mm`,
+                '中心穴の直径': `${params.holeDiameter.toFixed(2)} mm`,
+                '基準円直径': `${params.pitchDiameter.toFixed(2)} mm (確認用)`,
+            };
+
+            resultsContainer.innerHTML = Object.entries(fusionParams).map(([key, value]) => `
+                <div class="flex justify-between items-center text-sm">
+                    <span class="font-medium text-gray-600 dark:text-gray-400">${key}:</span>
+                    <span class="font-mono text-sm font-semibold text-gray-800 dark:text-gray-200 bg-gray-500/10 px-2 py-0.5 rounded-md">${value}</span>
+                </div>`).join('');
+            
+            if (is3DMode) {
+                update3DPreview(params);
+            } else {
+                draw2DGearPreview(params);
+            }
+        }
+
+        function createGearShape({ numTeeth, module, pressureAngle, holeDiameter }) {
+            const shape = new THREE.Shape();
+
+            // 基本的なギアパラメータ
+            const pAngleRad = pressureAngle * Math.PI / 180;
+            const pitchRadius = (numTeeth * module) / 2;
+            const baseRadius = pitchRadius * Math.cos(pAngleRad);
+            const addendum = module;
+            const dedendum = module * 1.25;
+            const outerRadius = pitchRadius + addendum;
+            let rootRadius = pitchRadius - dedendum;
+
+            // 歯底円が基礎円より小さい場合、インボリュート曲線が成立しないため基礎円に合わせる
+            if (rootRadius < baseRadius) {
+                rootRadius = baseRadius;
+            }
+
+            // 歯の片側のインボリュート曲線の座標を生成
+            const flankPoints = [];
+            const maxInvoluteAngle = Math.sqrt(outerRadius**2 / baseRadius**2 - 1);
+            const numFlankPoints = 10;
+            for (let i = 0; i <= numFlankPoints; i++) {
+                const angle = (i / numFlankPoints) * maxInvoluteAngle;
+                const x = baseRadius * (Math.cos(angle) + angle * Math.sin(angle));
+                const y = baseRadius * (Math.sin(angle) - angle * Math.cos(angle));
+                flankPoints.push(new THREE.Vector2(x, y));
+            }
+            
+            // 歯を配置するための角度関連の計算
+            const toothAngle = (2 * Math.PI) / numTeeth;
+            const toothHalfThicknessAngleOnPitch = (Math.PI / (2 * numTeeth));
+            const involuteStartAngle = Math.tan(pAngleRad) - pAngleRad; // インボリュート曲線を正しく配置するためのオフセット角
+
+            // 全ての歯の輪郭を生成
+            for (let i = 0; i < numTeeth; i++) {
+                const currentToothCenterAngle = i * toothAngle;
+
+                // 歯の右側と左側の歯面の角度を計算
+                const rightFlankBaseAngle = currentToothCenterAngle + toothHalfThicknessAngleOnPitch + involuteStartAngle;
+                const leftFlankBaseAngle = currentToothCenterAngle - toothHalfThicknessAngleOnPitch - involuteStartAngle;
+                
+                const rightMatrix = new THREE.Matrix3().makeRotation(rightFlankBaseAngle);
+                const leftMatrix = new THREE.Matrix3().makeRotation(leftFlankBaseAngle);
+
+                // 歯面の実際の座標を計算
+                // 右歯面（歯元から歯先へ）、Y軸で反転させている
+                const rightFlank = flankPoints.map(p => {
+                    const pt = p.clone();
+                    pt.y *= -1; 
+                    return pt.applyMatrix3(rightMatrix);
+                });
+
+                // 左歯面（歯先から歯元へ）
+                const leftFlank = flankPoints.map(p => p.clone().applyMatrix3(leftMatrix)).reverse();
+                
+                // 歯面が歯底円と交差する点を計算
+                const leftRootPoint = leftFlank[leftFlank.length - 1].clone().setLength(rootRadius);
+                
+                // パスの描画
+                if (i === 0) {
+                    shape.moveTo(leftRootPoint.x, leftRootPoint.y);
+                } else {
+                    // 前の歯からの谷（歯底円の円弧）を描画
+                    shape.absarc(0, 0, rootRadius, shape.currentPoint.angle(), leftRootPoint.angle(), false);
+                }
+
+                // 左歯面を描画
+                leftFlank.forEach(p => shape.lineTo(p.x, p.y));
+                
+                // 歯先（歯先円の円弧）を描画
+                shape.absarc(0, 0, outerRadius, leftFlank[0].angle(), rightFlank[rightFlank.length - 1].angle(), false);
+                
+                // 右歯面を描画
+                rightFlank.reverse().forEach(p => shape.lineTo(p.x, p.y));
+            }
+            
+            // 最後の歯から最初の歯への谷をつないで形状を閉じる
+            const firstPoint = shape.getPoint(0);
+            shape.absarc(0, 0, rootRadius, shape.currentPoint.angle(), firstPoint.angle(), false);
+
+            // 中心穴を追加
+            if (holeDiameter > 0) {
+                const holePath = new THREE.Path();
+                holePath.absarc(0, 0, holeDiameter / 2, 0, Math.PI * 2, true);
+                shape.holes.push(holePath);
+            }
+            return shape;
+        }
+
+        function update3DPreview(params) {
+            if (currentGear) {
+                scene.remove(currentGear);
+                currentGear.geometry.dispose();
+                currentGear.material.dispose();
+            }
+            const shape = createGearShape(params);
+            const extrudeSettings = { depth: params.gearThickness, bevelEnabled: false };
+            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            geometry.center();
+            
+            const material = new THREE.MeshStandardMaterial({ color: 0x9e9e9e, metalness: 0.2, roughness: 0.6, side: THREE.DoubleSide });
+            currentGear = new THREE.Mesh(geometry, material);
+            currentGear.rotation.x = -Math.PI / 2;
+            scene.add(currentGear);
+            
+            const outerDiameter = params.module * (params.numTeeth + 2);
+            const camDistance = outerDiameter * 1.5;
+            camera.position.set(camDistance, camDistance, camDistance).clampLength(50, 1000);
+            camera.lookAt(0,0,0);
+            
+            const gridSize = Math.ceil(outerDiameter / 10) * 10 * 2;
+            const gridDivisions = Math.max(2, gridSize / 10);
+            scene.remove(gridHelper);
+            const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const gridColor = isDarkMode ? 0x555555 : 0xcccccc;
+            gridHelper = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor);
+            gridHelper.material.opacity = 0.5;
+            gridHelper.material.transparent = true;
+            scene.add(gridHelper);
+            scaleInfo.textContent = `Grid: ${gridSize / gridDivisions} mm`;
+        }
+        
+        function draw2DGearPreview(params) {
+            svg2D.innerHTML = '';
+            const shape = createGearShape(params);
+            
+            // THREE.ShapeからSVGパスデータへ高精度に変換
+            // 歯の数に応じて解像度を調整し、滑らかな曲線を確保
+            const divisions = Math.max(200, params.numTeeth * 12);
+            const points = shape.getPoints(divisions);
+            
+            let d = 'M ' + points.map(p => `${p.x} ${p.y}`).join(' L ') + ' Z';
+
+            // 穴のパスも同様にポイントから生成
+            shape.holes.forEach(hole => {
+                const holePoints = hole.getPoints(50); // 円は50分割で十分滑らか
+                d += ' M ' + holePoints.map(p => `${p.x} ${p.y}`).join(' L ') + ' Z';
+            });
+            
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', d);
+            path.setAttribute('fill-rule', 'evenodd'); // evenoddルールで穴を正しく描画
+            path.setAttribute('fill', 'rgb(125, 135, 150)');
+            path.setAttribute('stroke', 'rgb(100, 110, 125)');
+            path.setAttribute('stroke-width', 0.2);
+
+            const outerRadius = params.module * (params.numTeeth + 2) / 2;
+            const scale = 105 / outerRadius;
+            path.setAttribute('transform', `scale(${scale}, ${-scale})`);
+
+            // グリッド線を追加
+            const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const gridColorSVG = isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+            gridGroup.setAttribute('stroke', gridColorSVG);
+            gridGroup.setAttribute('stroke-width', '0.25');
+            for(let i = -10; i<=10; i++){
+                if (i === 0) continue;
+                gridGroup.innerHTML += `<line x1="${i*10}" y1="-100" x2="${i*10}" y2="100" />`;
+                gridGroup.innerHTML += `<line x1="-100" y1="${i*10}" x2="100" y2="${i*10}" />`;
+            }
+            const axisColorSVG = isDarkMode ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.25)';
+            gridGroup.innerHTML += `<line x1="0" y1="-110" x2="0" y2="110" stroke="${axisColorSVG}" />`;
+            gridGroup.innerHTML += `<line x1="-110" y1="0" x2="110" y2="0" stroke="${axisColorSVG}" />`;
+            
+            svg2D.appendChild(gridGroup);
+            svg2D.appendChild(path);
+        }
+
+        // --- イベントリスナー ---
+        Object.values(inputs).forEach(input => input.addEventListener('input', updateGearParameters));
+
+        toggle2dBtn.addEventListener('click', () => {
+            if (is3DMode) {
+                is3DMode = false;
+                toggle2dBtn.classList.add('active');
+                toggle3dBtn.classList.remove('active');
+                previewContainer3D.classList.add('hidden');
+                previewContainer2D.classList.remove('hidden');
+                previewHelperText.classList.add('hidden');
+                updateGearParameters();
+            }
+        });
+
+        toggle3dBtn.addEventListener('click', () => {
+            if (!is3DMode) {
+                is3DMode = true;
+                toggle3dBtn.classList.add('active');
+                toggle2dBtn.classList.remove('active');
+                previewContainer2D.classList.add('hidden');
+                previewContainer3D.classList.remove('hidden');
+                previewHelperText.classList.remove('hidden');
+                updateGearParameters();
+            }
+        });
+
+        window.addEventListener('load', () => {
+            init3D();
+            updateGearParameters();
+        });
+    </script>
+</body>
+</html>
+
